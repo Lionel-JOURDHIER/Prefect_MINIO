@@ -24,42 +24,77 @@ git clone [https://github.com/Lionel-JOURDHIER/MINIO_.git](https://github.com/Li
 ### 2. Préparation de l'environnement
 Assurez-vous d'avoir **Docker Desktop** lancé et le gestionnaire de paquets **uv** installé.
 vous allez avoir besoin de 2 terminaux : 
-- Un terminal pour exécuter les commandes d'entrainement
+- Un terminal pour exécuter le serveur de training
 - Un terminal pour exécuter les commandes de Docker.
 
 ```bash
 (cd src/train && uv sync)
 ```
 
-### 3. Lancer Docker
+### 3. Lancer le docker du serveur de training
+
+```bash
+(cd src/train && docker compose -f docker_compose.prefect.yml up --build -d)
+```
+
+### 4. Lancer le docker du serveur de l'API et de mlflow
 ```bash
 docker compose build && docker compose up -d
 ```
 
-### 4. Entrainement du premier modèle 
-Attention si c'est la première fois que vous lancez le contener minio, aucun modèle n'est présent, il faut absoluement faire un entrainement avant de lancer l'application.
+### 5. Entrainement du premier modèle 
+Si vous lancez l'application la première fois, il faurdra créer le premier modèle. 
+Nous vous invitons donc à lancer donc à lancer la commande suivante : 
 ```bash
-(cd src/train && uv run python train.py)
+(cd src/train && uv run python train.py --init)
+```
+cette commande va : 
+- aller dans le dossier d'entrainement, 
+- lancer le flow d'entrainement pour prefect
+- Retourner à la racine
+
+Attention n'oubliez pas de lancer le server de training avant d'exécuter les commandes
+Si vous ne souhaitez pas lancer le serveur via docker compose pour le lancement, 
+vous pouvez uttiliser la commande suivante : 
+```bash
+prefect server start
 ```
 
-## Cycle de Vie du Modèle
-- **Étape 1** : Entraînement et Enregistrement
-Lancez l'entraînement depuis votre terminal hôte. Le script entraîne un modèle Random Forest, logue les métriques (accuracy) sur MLflow et upload le modèle vers MinIO.
+## Automatisation de la création de modèles avec prefect
+
+### Creation des workers
 ```bash
-(cd src/train && uv run python train.py)
+prefect work-pool create "train-pool" --type docker
+```
+
+### Limitation du nombre de worker si espace disque limité
+```bash
+prefect work-pool update --concurrency-limit 1 train-pool
+```
+
+### Deploiement suivant le fichier prefect.yaml
+```bash
+(cd src/train && prefect deploy --all)
+```
+
+### Démarage des workers
+```bash
+prefect worker start --pool 'train-pool'
 ```
 
 - **Étape 2** : Vérification technique
 Les adresses sont celle definis dans le fichier .env. Vous pouvez utiliser les adresses pour tester la fonctionnalité de prédiction.
+* Prefect : http://localhost:4200 (Verification que l'automatisation est bien déployée, que les workpools sont bien créés et possibilité de lancer des run de test depuis l'onglet Deployments)
+  
+* MLflow UI : http://localhost:5000 (Vérifiez que le modèle est bien enregistré dans le Registry).
 
-MLflow UI : http://localhost:5000 (Vérifiez que le modèle est bien enregistré dans le Registry).
-
-MinIO Console : http://localhost:9001 (Vérifiez la présence des artefacts dans le bucket mlflow).
+* MinIO Console : http://localhost:9001 (Vérifiez la présence des artefacts dans le bucket mlflow).
 
 - **Étape 3** : Prédiction
 API (Swagger) : http://localhost:8000/docs
 
 Frontend Streamlit : http://localhost:8501
+
 
 ## 📂 Structure du Projet
 ```
@@ -88,9 +123,12 @@ Frontend Streamlit : http://localhost:8501
 │   └── train/          # Scripts d'entraînement
 │   │   │   ├── services
 │   │   │   │   ├── __init__.py     
-│   │   │   │   ├── def_model.py          # Définition du modèle
-│   │   │   │   └── prep_data_iris.py     # Préparation des données Iris
-│   │   │   ├── train.py              # Point d'entrée du front
+│   │   │   │   ├── def_model.py                # Définition du modèle
+│   │   │   │   └── prep_data_iris.py           # Préparation des données Iris
+│   │   │   ├── train.py                        # poitn d'entrée de l'entrainement des modèles
+│   │   │   ├── Dockerfile                      # Creation de workers
+│   │   │   ├── docker_compose.prefect.yml      # Docker compose pour l'utilisation de prefect
+│   │   │   ├── prefect.yaml                    # Configuration de l'automation du flow
 │   │   │   ├── pyproject.toml      # Gestion des dépendances (uv)
 │   │   │   ├── uv.lock             # Lockfile pour uv
 │   │   │   └── README.md           # Readme de la partie entrainement (TODO)
@@ -140,3 +178,9 @@ Bien mettre les allowed-hosts à jour pour permettre l'accès à votre applicati
 | **Supprimer les données (volumes)** | `docker compose down -v` |
 | **Vérifier l'état des conteneurs** | `docker compose ps` |
 | **Supprimer les images / REGULIEREMENT** | `docker image prune -a` |
+
+
+Commande pour lancer prefect
+```bash
+(cd src/train && docker compose -f docker_compose.prefect.yml up -d)
+```

@@ -8,6 +8,8 @@ dependencies = [
     "boto3>=1.42.69",
     "dotenv>=0.9.9",
     "mlflow>=3.10.1",
+    "prefect>=3.6.23",
+    "prefect-docker>=0.7.1",
     "requests>=2.32.5",
     "scikit-learn>=1.8.0",
 ]

@@ -20,11 +20,12 @@ services:
       --host 0.0.0.0
       --port ${MLFLOW_PORT:-5000}
       --dev
-      --allowed-hosts "mlflow:*, localhost:*, minio:*" 
+      --allowed-hosts "*" 
     volumes:
       - ./mlflow_data:/database
     networks:
       - api-backend
+      - prefect-network
 
   minio:
     image: minio/minio
@@ -37,13 +38,14 @@ services:
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
       MINIO_PORT_S3: ${MINIO_PORT_S3:-9000}
       MINIO_PORT_WEB: ${MINIO_PORT_WEB:-9001}
-      MINIO_BROWSER_REDIRECT_URL: "http://localhost:${MINIO_PORT_WEB:-9001}"
+      MINIO_BROWSER_REDIRECT_URL: "http://minio:${MINIO_PORT_WEB:-9001}"
       MLFLOW_TRACKING_URI: "http://mlflow:${MLFLOW_PORT:-5000}"
     command: server /data --address ":${MINIO_PORT_S3:-9000}" --console-address ":${MINIO_PORT_WEB:-9001}"
     volumes:
       - minio_data:/data  # dossier /data de MinIO 
     networks:
       - api-backend
+      - prefect-network
 
   streamlit-app:
     build:
@@ -61,7 +63,7 @@ services:
 
   api-app:
     build :
-      context: ./src/api                # On part de la racine du projet
+      context: ./src/api
       dockerfile: Dockerfile
     container_name: mon_api
     depends_on:
@@ -76,6 +78,7 @@ services:
     networks:
       - front-api
       - api-backend
+      - prefect-network
 
 volumes:
   minio_data:  
@@ -86,3 +89,6 @@ networks:
     driver: bridge
   api-backend: 
     driver: bridge
+  prefect-network:
+    driver: bridge
+    external: true
