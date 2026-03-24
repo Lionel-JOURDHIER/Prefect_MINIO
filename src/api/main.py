@@ -1,10 +1,11 @@
 import os
+import time
 
 import pandas as pd
 import psutil
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from loguru import logger
 from modules.load_model import load_production_model
 from modules.modele_reg import prepare_minio
@@ -13,6 +14,7 @@ from prometheus_client import (
     CollectorRegistry,
     Counter,
     Gauge,
+    Histogram,
     generate_latest,
 )
 from pydantic import BaseModel
@@ -31,11 +33,69 @@ app = FastAPI(title="Iris Prediction API")
 my_registry = CollectorRegistry()
 
 REQUEST_COUNT = Counter(
-    "app_requests_total", "Total requests", ["method", "endpoint"], registry=my_registry
+    "app_requests_total",
+    "Total des requêtes",
+    ["method", "endpoint", "status_code"],
+    registry=my_registry,
 )
+
+# 2. Durée des requêtes — permet P50/P90/P99
+REQUEST_DURATION = Histogram(
+    "app_request_duration_seconds",
+    "Durée des requêtes en secondes",
+    ["endpoint"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
+    registry=my_registry,
+)
+
+# 3. Requêtes en cours (en temps réel)
+REQUESTS_IN_PROGRESS = Gauge(
+    "app_requests_in_progress",
+    "Requêtes en cours de traitement",
+    registry=my_registry,
+)
+
+# 4. Prédictions par classe — détection de dérive du modèle
+PREDICTION_COUNT = Counter(
+    "app_predictions_total",
+    "Prédictions par classe Iris",
+    ["predicted_class"],
+    registry=my_registry,
+)
+
 CPU_USAGE = Gauge("system_cpu_usage", "Usage CPU", registry=my_registry)
 
 logger.add("/logs/fastapi.log", rotation="500 MB")
+
+
+# Middleware — instrumente toutes les routes
+@app.middleware("http")
+async def prometheus_middleware(request: Request, call_next):
+    REQUESTS_IN_PROGRESS.inc()
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status_code=str(response.status_code),
+        ).inc()
+        REQUEST_DURATION.labels(endpoint=request.url.path).observe(
+            time.perf_counter() - start
+        )
+        return response
+    except Exception as exc:
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status_code="500",
+        ).inc()
+        REQUEST_DURATION.labels(endpoint=request.url.path).observe(
+            time.perf_counter() - start
+        )
+        raise exc
+    finally:
+        REQUESTS_IN_PROGRESS.dec()
 
 
 # Définition du format d'entrée (les 4 mesures de la fleur)
@@ -50,7 +110,8 @@ class IrisInput(BaseModel):
 async def predict(data: IrisInput):
     # 1. Charger le modèle (utilise le cache ou recharge si nécessaire)
     logger.info(f"Donnée reçue : {data}")
-    REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
+    PREDICTION_COUNT.labels(predicted_class="test").inc()
+    # REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
     model, version = load_production_model()
 
     if model is None:
@@ -75,6 +136,8 @@ async def predict(data: IrisInput):
         target_names = ["setosa", "versicolor", "virginica"]
         predicted_class = target_names[int(prediction[0])]
 
+        PREDICTION_COUNT.labels(predicted_class=predicted_class).inc()
+
         return {
             "prediction": predicted_class,
             "class_index": int(prediction[0]),
@@ -86,19 +149,9 @@ async def predict(data: IrisInput):
         )
 
 
-# @app.post("/predict")
-# async def predict(data: IrisInput):
-#     # Simule une réponse sans appeler MLflow pour vérifier que Streamlit s'affiche
-#     return {
-#         "prediction": "setosa (TEST MODE)",
-#         "class_index": 0,
-#         "model_version": "0.0.0-draft",
-#     }
-
-
 @app.get("/")
 async def root():
-    REQUEST_COUNT.labels(method="GET", endpoint="/").inc()
+    # REQUEST_COUNT.labels(method="GET", endpoint="/").inc()
     return {"status": "API is alive"}
 
 
