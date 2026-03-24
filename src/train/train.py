@@ -92,7 +92,6 @@ if __name__ == "__main__":
 
     if __name__ == "__main__":
         if len(sys.argv) > 1 and sys.argv[1] == "--run":
-            # MODE LANCEUR : python train.py run
             run_deployment(name="Flow d'entrainement de model/train_a_model")
             print(" Run lancé !")
         elif len(sys.argv) > 1 and sys.argv[1] == "--init":
@@ -107,7 +106,6 @@ if __name__ == "__main__":
                 description="Entraînement via méthode .serve()",
             )
         else:
-            # MODE WORKER : python train.py
             print(" Worker en attente...")
             subprocess.check_call(
                 ["prefect", "worker", "start", "--pool", "train-pool"]

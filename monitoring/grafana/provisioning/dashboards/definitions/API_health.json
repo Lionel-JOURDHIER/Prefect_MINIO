@@ -1,0 +1,45 @@
+{
+  "editable": true,
+  "panels": [
+    {
+      "title": "API Status",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "pluginVersion": "9.0.0",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "targets": [
+        { "expr": "up{job='api-app'}", "refId": "A" }
+      ]
+    },
+    {
+      "title": "Total Requests (1m Rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(app_requests_total[1m]))", "legendFormat": "Req/sec", "refId": "B" }
+      ]
+    },
+    {
+      "title": "HTTP Errors (4xx & 5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }
+      },
+      "targets": [
+        { "expr": "sum(rate(app_requests_total{status_code=~'4..|5..'}[1m]))", "legendFormat": "Errors", "refId": "C" }
+      ]
+    }
+  ],
+  "schemaVersion": 36,
+  "title": "API Health Dashboard",
+  "uid": "api-health-fastapi",
+  "refresh": "5s"
+}

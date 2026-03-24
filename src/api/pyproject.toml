@@ -8,9 +8,13 @@ dependencies = [
     "boto3",
     "dotenv",
     "fastapi",
+    "loguru>=0.7.3",
     "mlflow",
     "pandas",
+    "prometheus-client>=0.24.1",
     "protobuf",
+    "psutil>=7.2.2",
+    "prometheus_client>=0.24.1",
     "setuptools",
     "uvicorn",
 ]

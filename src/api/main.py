@@ -1,16 +1,41 @@
 import os
 
 import pandas as pd
+import psutil
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from loguru import logger
 from modules.load_model import load_production_model
 from modules.modele_reg import prepare_minio
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    generate_latest,
+)
 from pydantic import BaseModel
+from starlette.responses import Response
 
 load_dotenv()
 
 app = FastAPI(title="Iris Prediction API")
+
+# si problème dans les metrics de prometheus, on peut désenregistrer le registre
+# for collector in list(REGISTRY._collector_to_names.keys()):
+#     REGISTRY.unregister(collector)
+
+
+# Monitoring
+my_registry = CollectorRegistry()
+
+REQUEST_COUNT = Counter(
+    "app_requests_total", "Total requests", ["method", "endpoint"], registry=my_registry
+)
+CPU_USAGE = Gauge("system_cpu_usage", "Usage CPU", registry=my_registry)
+
+logger.add("/logs/fastapi.log", rotation="500 MB")
 
 
 # Définition du format d'entrée (les 4 mesures de la fleur)
@@ -24,6 +49,8 @@ class IrisInput(BaseModel):
 @app.post("/predict")
 async def predict(data: IrisInput):
     # 1. Charger le modèle (utilise le cache ou recharge si nécessaire)
+    logger.info(f"Donnée reçue : {data}")
+    REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
     model, version = load_production_model()
 
     if model is None:
@@ -71,7 +98,20 @@ async def predict(data: IrisInput):
 
 @app.get("/")
 async def root():
+    REQUEST_COUNT.labels(method="GET", endpoint="/").inc()
     return {"status": "API is alive"}
+
+
+@app.get("/metrics")
+async def metrics():
+    CPU_USAGE.set(psutil.cpu_percent())
+    return Response(generate_latest(my_registry), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/health")
+async def health_check():
+    logger.debug("get sur route health sonde uptime kuma")
+    return {"status": "OK", "message": "API is running"}
 
 
 if __name__ == "__main__":

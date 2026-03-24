@@ -79,6 +79,7 @@ services:
       - front-api
       - api-backend
       - prefect-network
+      - monitoring-network
 
 volumes:
   minio_data:  
@@ -90,5 +91,8 @@ networks:
   api-backend: 
     driver: bridge
   prefect-network:
+    driver: bridge
+    external: true
+  monitoring-network:
     driver: bridge
     external: true

@@ -31,18 +31,25 @@ vous allez avoir besoin de 2 terminaux :
 (cd src/train && uv sync)
 ```
 
-### 3. Lancer le docker du serveur de training
+### 3. Création du réseau (Indispensable)
+Avant de lancer les conteneurs, le réseau doit exister dans l'espace Docker :
+```bash
+docker network create --driver bridge --opt "com.docker.network.bridge.host_binding_ipv4"="127.0.0.1" monitoring-network
+```
+*Note : Si le réseau existe déjà, passez à l'étape suivante.*
+
+### 4. Lancer le docker du serveur de training
 
 ```bash
 (cd src/train && docker compose -f docker_compose.prefect.yml up --build -d)
 ```
 
-### 4. Lancer le docker du serveur de l'API et de mlflow
+### 5. Lancer le docker du serveur de l'API et de mlflow
 ```bash
 docker compose build && docker compose up -d
 ```
 
-### 5. Entrainement du premier modèle 
+### 6. Entrainement du premier modèle 
 Si vous lancez l'application la première fois, il faurdra créer le premier modèle. 
 Nous vous invitons donc à lancer donc à lancer la commande suivante : 
 ```bash
@@ -60,7 +67,7 @@ vous pouvez uttiliser la commande suivante :
 prefect server start
 ```
 
-## Automatisation de la création de modèles avec prefect
+## Automatisation de la création de modèles avec prefect (cas de déploiement)
 
 ### Creation des workers
 ```bash
@@ -76,24 +83,79 @@ prefect work-pool update --concurrency-limit 1 train-pool
 ```bash
 (cd src/train && prefect deploy --all)
 ```
+#### Alternative sans déploiement: Lancement des worker en local avec la fonction serve
+```bash
+(cd src/train && uv run python train.py --serve)
+```
 
 ### Démarage des workers
 ```bash
 prefect worker start --pool 'train-pool'
 ```
+#### Alternative : démarage des worker dans le fichier train.py
+```bash
+(cd src/train && uv run python train.py)
+```
 
-- **Étape 2** : Vérification technique
-Les adresses sont celle definis dans le fichier .env. Vous pouvez utiliser les adresses pour tester la fonctionnalité de prédiction.
-* Prefect : http://localhost:4200 (Verification que l'automatisation est bien déployée, que les workpools sont bien créés et possibilité de lancer des run de test depuis l'onglet Deployments)
-  
-* MLflow UI : http://localhost:5000 (Vérifiez que le modèle est bien enregistré dans le Registry).
+### Lancement d'une run sans attendre le scheduler de prefect
+Vous pouvez lancer la run sans attendre le scheduler de prefect en ouvrant l'UI de Prefect : `http://localhost:4200` 
+et en lançant une run de test depuis l'onglet Deployments.
 
-* MinIO Console : http://localhost:9001 (Vérifiez la présence des artefacts dans le bucket mlflow).
+#### Alternative : démarage de la run dans le fichier train.py
+```bash
+(cd src/train && uv run python train.py --run)
+```
 
-- **Étape 3** : Prédiction
-API (Swagger) : http://localhost:8000/docs
+### Fermeture du docker prefect (Attention les workers sont en attente si le docker n'est pas down)
+```bash
+(cd src/train && docker compose -f docker_compose.prefect.yml down)
+```
 
-Frontend Streamlit : http://localhost:8501
+## Monitoring
+### Commande pour lancer le monitoring : 
+```bash
+(cd monitoring && docker compose -f docker-compose.monitoring.yaml up -d)
+```
+### Prometheus
+Prometheus agit comme le cœur du système de monitoring en servant de base de données orientée séries temporelles. 
+Il est configuré pour "scrapper" (récupérer) activement les données de l'API FastAPI via son endpoint /metrics à intervalles réguliers. 
+Sa puissance réside dans son langage de requête, le PromQL, qui permet d'agréger des données brutes en indicateurs métier pertinents.
+
+Pour vérifier l'état de santé de vos cibles de collecte, l'interface native est accessible sur le port 9090. 
+C'est ici que vous pouvez valider que l'API est bien détectée comme "UP" et tester vos premières requêtes sur les métriques personnalisées, 
+comme le nombre total de requêtes ou les temps de latence de traitement des fichiers MinIO.
+
+### Grafana
+Grafana est l'outil de visualisation qui transforme les données brutes de Prometheus en tableaux de bord interactifs et lisibles. 
+Grâce au système de provisioning automatique inclus dans ce projet, la source de données Prometheus est pré-configurée au démarrage, 
+vous évitant ainsi toute manipulation manuelle répétitive dans l'interface graphique pour lier vos services.
+
+L'interface est disponible sur le port 3000 avec les identifiants par défaut définis dans le fichier de configuration. 
+Elle permet de créer des graphiques en temps réel pour surveiller l'utilisation des ressources système ou le flux de données passant par Streamlit, 
+offrant ainsi une vue d'ensemble immédiate sur la stabilité de votre architecture de données.
+
+### Uptime kuma
+Uptime Kuma complète ce dispositif en se concentrant sur la disponibilité pure et simple de vos services (Uptime). 
+Contrairement à Prometheus qui analyse les performances internes, Uptime Kuma vérifie de l'extérieur si vos interfaces Web et vos points d'accès API sont joignables, 
+simulant ainsi l'expérience réelle d'un utilisateur final.
+
+Cet outil propose une interface intuitive pour configurer des alertes immédiates en cas de coupure d'un service. 
+Il permet de générer des pages de statut publiques ou privées, offrant un historique clair des temps d'arrêt, 
+ce qui est essentiel pour maintenir un niveau de service élevé sur votre application de gestion de fichiers et de modèles ML.
+
+## Vérification technique
+Pour verifier que l'ensemble du projet est lancé, veuillez vous connecter aux adresses suivantes : 
+|Nom du service|Adresse|Objectif|
+|---|---|---|
+|API|http://localhost:8000|Vérifiez que l'API est fonctionnelle|
+|API (Swagger)|http://localhost:8000/docs||Vérifiez que la documentation interactive de l'API est accessible et fonctionnelle|
+|Frontend Streamlit|http://localhost:8501|Vérifiez que la page Streamlit est accessible et fonctionnelle|
+|MLFlow UI|http://localhost:5000|Vérifiez que le modèle est bien enregistré dans le Registry|
+|MinIO Console|http://localhost:9001|Vérifiez la présence des artefacts dans le bucket mlflow.|
+|Prefect UI|http://localhost:4200|Vérifiez que l'automatisation est bien déployée, que les workpools sont bien créés et possibilité de lancer des run de test depuis l'onglet Deployments|
+|Prometheus|http://localhost:9090|Vérifiez que les métriques sont bien exposées et scrappées|
+|Grafana|http://localhost:3000|Vérifiez que le dashboard est fonctionnel et affiche les métriques|
+|Uptime Kuma|http://localhost:3001|Vérifiez que le service de monitoring est fonctionnel|
 
 
 ## 📂 Structure du Projet
@@ -178,9 +240,11 @@ Bien mettre les allowed-hosts à jour pour permettre l'accès à votre applicati
 | **Supprimer les données (volumes)** | `docker compose down -v` |
 | **Vérifier l'état des conteneurs** | `docker compose ps` |
 | **Supprimer les images / REGULIEREMENT** | `docker image prune -a` |
+| **fermer le docker prefect** | `(cd src/train && docker compose -f docker_compose.prefect.yml down)` |
+| **fermer le docker monitorinng** | `(cd monitoring && docker compose -f docker-compose.monitoring.yaml down)` |
 
-
-Commande pour lancer prefect
+**Nota bene:** 
+pour toute les commandes prefect, le venv de train doit être ouvert. 
 ```bash
-(cd src/train && docker compose -f docker_compose.prefect.yml up -d)
+source src/train/.venv/bin/activate
 ```
