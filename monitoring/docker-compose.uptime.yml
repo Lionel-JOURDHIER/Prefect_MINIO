@@ -9,6 +9,11 @@ services:
     networks:
       - monitoring-network
     restart : unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.50'
 
 volumes:
   uptime-kuma-data:
