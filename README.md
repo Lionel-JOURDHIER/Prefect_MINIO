@@ -35,6 +35,7 @@ vous allez avoir besoin de 2 terminaux :
 Avant de lancer les conteneurs, le réseau doit exister dans l'espace Docker :
 ```bash
 docker network create --driver bridge --opt "com.docker.network.bridge.host_binding_ipv4"="127.0.0.1" monitoring-network
+docker network create --driver bridge --opt "com.docker.network.bridge.host_binding_ipv4"="127.0.0.1" prefect-network
 ```
 *Note : Si le réseau existe déjà, passez à l'étape suivante.*
 
@@ -68,15 +69,21 @@ prefect server start
 ```
 
 ## Automatisation de la création de modèles avec prefect (cas de déploiement)
-
+**Nota bene:** 
+pour toute les commandes prefect, le venv de train doit être ouvert. 
+```bash
+source src/train/.venv/bin/activate
+```
 ### Creation des workers
 ```bash
 prefect work-pool create "train-pool" --type docker
+prefect work-pool create "docker-cleaner-pool" --type docker
 ```
 
 ### Limitation du nombre de worker si espace disque limité
 ```bash
 prefect work-pool update --concurrency-limit 1 train-pool
+prefect work-pool update --concurrency-limit 1 docker-cleaner-pool
 ```
 
 ### Deploiement suivant le fichier prefect.yaml
@@ -243,8 +250,6 @@ Bien mettre les allowed-hosts à jour pour permettre l'accès à votre applicati
 | **fermer le docker prefect** | `(cd src/train && docker compose -f docker_compose.prefect.yml down)` |
 | **fermer le docker monitorinng** | `(cd monitoring && docker compose -f docker-compose.monitoring.yaml down)` |
 
-**Nota bene:** 
-pour toute les commandes prefect, le venv de train doit être ouvert. 
-```bash
-source src/train/.venv/bin/activate
-```
+
+
+atte

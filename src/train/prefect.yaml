@@ -25,17 +25,6 @@ push:
     image_name: '{{ build_image.image_name }}'
     tag: '{{ build_image.tag }}'
 
-# --- L'AUTOMATION DE NETTOYAGE ICI ---
-- prefect.deployments.steps.run_shell_script:
-    id: clean_images
-    script: "docker image prune -f"
-
-# pull section allows you to provide instructions for cloning
-# this project in remote locations
-pull:
-- prefect.deployments.steps.set_working_directory:
-    directory: /train
-
 # the deployments section allows you to provide configuration
 # for deploying flows
 deployments:
@@ -45,7 +34,7 @@ deployments:
   description: "Entraînement du modèle Iris avec tracking MLflow sur le Serveur 2"
   schedule: {cron: "*/5 * * * *"}
   flow_name: null
-  entrypoint: "./train.py:flow_train"
+  entrypoint: ./train.py:flow_train
   parameters: {}
   work_pool:
     name: "train-pool"
@@ -56,5 +45,6 @@ deployments:
       env:
         MLFLOW_HOST: "host.docker.internal"
         MINIO_HOST: "host.docker.internal"
-
-          
+  pull:
+    - prefect.deployments.steps.set_working_directory:
+        directory: .
