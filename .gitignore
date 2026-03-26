@@ -17,3 +17,5 @@ mlflow.db
 **/.coverage
 **/.pytest_cache
 **/public
+logs/
+*.rst
