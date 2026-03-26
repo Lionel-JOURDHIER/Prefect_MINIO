@@ -13,3 +13,7 @@ wheels/
 
 mlartifacts/
 mlflow.db
+
+**/.coverage
+**/.pytest_cache
+**/public
