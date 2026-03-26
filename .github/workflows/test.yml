@@ -81,6 +81,31 @@ jobs:
             echo "Aucun test trouvé ou erreur lors de l'exécution." >> $GITHUB_STEP_SUMMARY
           fi
 
+      # --- TESTS TRAIN (BACK-END) ---
+      - name: Install dependencies app_train
+        run: uv sync --project src/app_train --frozen --all-extras --all-groups
+
+      - name: Run Tests src/app_train
+        env:
+          FASTAPI_PORT: 8000
+        run: |
+          # Exécution et capture
+          uv run --project src/app_train pytest tests/ \
+            -c src/app_train/pyproject.toml \
+            --cov=src/app_train \
+            --cov-config=src/app_train/pyproject.toml \
+            --no-cov-on-fail \
+            --cov-report=term-missing \
+            --cov-report=json:src/app_train/coverage_front.json \
+            > src/app_train/pytest_report_front.txt 2>&1
+          
+          echo "### UI Back-end" >> $GITHUB_STEP_SUMMARY
+          if grep -q 'TOTAL' src/app_train/pytest_report_front.txt; then
+            grep 'TOTAL' src/app_train/pytest_report_front.txt | awk '{print "Couverture totale : " $NF}' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Aucun test trouvé ou erreur lors de l'exécution." >> $GITHUB_STEP_SUMMARY
+          fi
+    
       # --- ARCHIVAGE ---
       - name: Archive Code Coverage Results
         uses: actions/upload-artifact@v4
@@ -92,3 +117,5 @@ jobs:
             src/app_front/htmlcov_front/
             src/app_api/pytest_report_api.txt
             src/app_api/htmlcov_api/
+            src/app_train/pytest_report_api.txt
+            src/app_train/htmlcov_api/
