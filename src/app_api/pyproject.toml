@@ -18,3 +18,31 @@ dependencies = [
     "setuptools",
     "uvicorn",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["app_api"] 
+testpaths = ["../../tests"]
+python_files = ["test_api_*.py"]
+
+[tool.coverage.run]
+# On définit explicitement la racine de recherche du code
+source = ["./app_api"]
+# On ignore tout ce qui n'est pas dans app_api (au cas où)
+omit = [
+    "./app_front/*",
+    "app_front/*",
+    "./app_train/*",
+    "app_train/*",
+    "./tests/*",
+    "tests/*"
+]
+
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "requests>=2.32.5",
+    "ruff>=0.15.4",
+]

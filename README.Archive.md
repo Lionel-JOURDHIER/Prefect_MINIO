@@ -28,7 +28,7 @@ vous allez avoir besoin de 2 terminaux :
 - Un terminal pour exécuter les commandes de Docker.
 
 ```bash
-(cd src/train && uv sync)
+(cd src/app_train && uv sync)
 ```
 
 ### 3. Création du réseau (Indispensable)
@@ -42,7 +42,7 @@ docker network create --driver bridge --opt "com.docker.network.bridge.host_bind
 ### 4. Lancer le docker du serveur de training
 
 ```bash
-(cd src/train && docker compose -f docker_compose.prefect.yml up --build -d)
+(cd src/app_train && docker compose -f docker_compose.prefect.yml up --build -d)
 ```
 
 ### 5. Lancer le docker du serveur de l'API et de mlflow
@@ -54,7 +54,7 @@ docker compose build && docker compose up -d
 Si vous lancez l'application la première fois, il faurdra créer le premier modèle. 
 Nous vous invitons donc à lancer donc à lancer la commande suivante : 
 ```bash
-(cd src/train && uv run python train.py --init)
+(cd src/app_train && uv run python train.py --init)
 ```
 cette commande va : 
 - aller dans le dossier d'entrainement, 
@@ -72,7 +72,7 @@ prefect server start
 **Nota bene:** 
 pour toute les commandes prefect, le venv de train doit être ouvert. 
 ```bash
-source src/train/.venv/bin/activate
+source src/app_train/.venv/bin/activate
 ```
 ### Creation des workers
 ```bash
@@ -86,11 +86,11 @@ prefect work-pool update --concurrency-limit 1 train-pool
 
 ### Deploiement suivant le fichier prefect.yaml
 ```bash
-(cd src/train && prefect deploy --all)
+(cd src/app_train && prefect deploy --all)
 ```
 #### Alternative sans déploiement: Lancement des worker en local avec la fonction serve
 ```bash
-(cd src/train && uv run python train.py --serve)
+(cd src/app_train && uv run python train.py --serve)
 ```
 
 ### Démarage des workers
@@ -99,7 +99,7 @@ prefect worker start --pool 'train-pool'
 ```
 #### Alternative : démarage des worker dans le fichier train.py
 ```bash
-(cd src/train && uv run python train.py)
+(cd src/app_train && uv run python train.py)
 ```
 
 ### Lancement d'une run sans attendre le scheduler de prefect
@@ -108,12 +108,12 @@ et en lançant une run de test depuis l'onglet Deployments.
 
 #### Alternative : démarage de la run dans le fichier train.py
 ```bash
-(cd src/train && uv run python train.py --run)
+(cd src/app_train && uv run python train.py --run)
 ```
 
 ### Fermeture du docker prefect (Attention les workers sont en attente si le docker n'est pas down)
 ```bash
-(cd src/train && docker compose -f docker_compose.prefect.yml down)
+(cd src/app_train && docker compose -f docker_compose.prefect.yml down)
 ```
 
 ## Monitoring
@@ -168,7 +168,7 @@ Pour verifier que l'ensemble du projet est lancé, veuillez vous connecter aux a
 .
 ├── data/               # Datasets (iris_test.csv)
 ├── src/
-│   ├   ├── api/            # Backend FastAPI (logique de chargement MLflow)
+│   ├   ├── app_api/            # Backend FastAPI (logique de chargement MLflow)
 │   │   │   ├── modules
 │   │   │   │   ├── load_model.py         # Chargement des models depuis MINIO
 │   │   │   │   └── modele_reg.py         # Préparation de MINIO - création automatique de bucket
@@ -177,7 +177,7 @@ Pour verifier que l'ensemble du projet est lancé, veuillez vous connecter aux a
 │   │   │   ├── pyproject.toml      # Gestion des dépendances (uv)
 │   │   │   ├── uv.lock             # Lockfile pour uv
 │   │   │   └── README.md           # Readme de la partie API (TODO)
-│   ├── front/          # Frontend Streamlit (interface utilisateur)
+│   ├── app_front/          # Frontend Streamlit (interface utilisateur)
 │   │   │   ├── services
 │   │   │   │   └── Vide            # Services Streamlit selon besoin
 │   │   │   ├── pages
@@ -187,7 +187,7 @@ Pour verifier que l'ensemble du projet est lancé, veuillez vous connecter aux a
 │   │   │   ├── pyproject.toml      # Gestion des dépendances (uv)
 │   │   │   ├── uv.lock             # Lockfile pour uv
 │   │   │   └── README.md           # Readme de la partie Front (TODO)
-│   └── train/          # Scripts d'entraînement
+│   └── app_train/          # Scripts d'entraînement
 │   │   │   ├── services
 │   │   │   │   ├── __init__.py     
 │   │   │   │   ├── def_model.py                # Définition du modèle
@@ -245,6 +245,6 @@ Bien mettre les allowed-hosts à jour pour permettre l'accès à votre applicati
 | **Supprimer les données (volumes)** | `docker compose down -v` |
 | **Vérifier l'état des conteneurs** | `docker compose ps` |
 | **Supprimer les images / REGULIEREMENT** | `docker image prune -a` |
-| **fermer le docker prefect** | `(cd src/train && docker compose -f docker_compose.prefect.yml down)` |
+| **fermer le docker prefect** | `(cd src/app_train && docker compose -f docker_compose.prefect.yml down)` |
 | **fermer le docker monitorinng** | `(cd monitoring && docker compose -f docker-compose.monitoring.yaml down)` |
 

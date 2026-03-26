@@ -20,8 +20,8 @@ MINIO_PORT_S3 = os.getenv("MINIO_PORT_S3", "9000")
 S3_ENDPOINT = f"http://{MINIO_HOST}:{MINIO_PORT_S3}"
 os.environ["MLFLOW_TRACKING_URI"] = TRACKING_URI
 os.environ["MLFLOW_S3_ENDPOINT_URL"] = S3_ENDPOINT
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minio_user")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "mini_password")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minioadmin")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin")
 os.environ["AWS_ACCESS_KEY_ID"] = AWS_ACCESS_KEY_ID
 os.environ["AWS_SECRET_ACCESS_KEY"] = AWS_SECRET_ACCESS_KEY
 
