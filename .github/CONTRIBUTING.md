@@ -1,6 +1,6 @@
-# Guide de contribution à %REPO%
+# Guide de contribution à Prefect_MINIO
 
-Merci de l'intérêt que vous portez à **%REPO%** ! Ce projet est actuellement en version **v%VERSION%**. 
+Merci de l'intérêt que vous portez à **Prefect_MINIO** ! Ce projet est actuellement en version **v**. 
 
 Nous accueillons avec plaisir toutes les contributions : rapports de bugs, suggestions de fonctionnalités ou améliorations du code.
 
@@ -12,8 +12,8 @@ Ce projet utilise [uv](https://github.com/astral-sh/uv) pour une gestion ultra-r
 
 1. **Cloner le projet** :
    ```bash
-   git clone [https://github.com/%USER%/%REPO%.git](https://github.com/%USER%/%REPO%.git)
-   cd %REPO%
+   git clone [https://github.com/Lionel-JOURDHIER/Prefect_MINIO.git](https://github.com/Lionel-JOURDHIER/Prefect_MINIO.git)
+   cd Prefect_MINIO
    ```
 
 2. **Installer les dépendances** :
@@ -29,7 +29,7 @@ Ce projet utilise [uv](https://github.com/astral-sh/uv) pour une gestion ultra-r
     ```
 
 ## Workflow de travail
-Nous suivons un cycle de développement structuré pour garantir la stabilité de **v%VERSION%**.
+Nous suivons un cycle de développement structuré pour garantir la stabilité de **v**.
 
 1. **Créer une branche de travail**
     ```bash
@@ -37,7 +37,7 @@ Nous suivons un cycle de développement structuré pour garantir la stabilité d
     ```
 
 2. **Créer un nouveau fichier**
-   * Pour le code source : ajoutez votre fichier .py dans le dossier src/%REPO%/ (ou le dossier racine du module).
+   * Pour le code source : ajoutez votre fichier .py dans le dossier src/Prefect_MINIO/ (ou le dossier racine du module).
    * Pour la documentation : utilisez le dossier docs/.
 
 3. **Ajouter votre code**
@@ -56,4 +56,4 @@ Créez un fichier de test correspondant dans tests/ (ex: test_votre_fichier.py).
 Poussez votre branche sur GitHub et ouvrez une Pull Request. Décrivez clairement l'utilité du nouveau fichier créé.
 
 6. **Attendre la revue de code et les commentaires**
-Un responsable (ou %USER%) examinera vos changements. Répondez aux commentaires et apportez les ajustements nécessaires avant le merge final.
+Un responsable (ou Lionel-JOURDHIER) examinera vos changements. Répondez aux commentaires et apportez les ajustements nécessaires avant le merge final.

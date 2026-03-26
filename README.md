@@ -18,7 +18,7 @@ L'infrastructure est entièrement conteneurisée avec **Docker Compose** et s'ar
 ## Installation et Démarrage
 ### 1.Clonage du projet : 
 ```bash
-git clone [https://github.com/Lionel-JOURDHIER/MINIO_.git](https://github.com/Lionel-JOURDHIER/MINIO_.git) && cd MINIO_
+git clone [https://github.com/Lionel-JOURDHIER/Prefect_MINIO](https://github.com/Lionel-JOURDHIER/Prefect_MINIO) && cd Prefect_MINIO
 ```
 
 ### 2. Préparation de l'environnement
