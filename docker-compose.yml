@@ -60,7 +60,7 @@ services:
 
   streamlit-app:
     build:
-      context: ./src/front
+      context: ./src/app_front
       dockerfile: Dockerfile
     ports:
       - "${STREAMLIT_PORT:-8501}:${STREAMLIT_PORT:-8501}"
@@ -79,7 +79,7 @@ services:
 
   api-app:
     build :
-      context: ./src/api
+      context: ./src/app_api
       dockerfile: Dockerfile
     container_name: mon_api
     depends_on:
