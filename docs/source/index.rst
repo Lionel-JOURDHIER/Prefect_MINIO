@@ -15,7 +15,12 @@ documentation for details.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Navigation:
+   
+   modules
+   app_api
+   app_front
+   app_train
 
 Indices and tables
 ==================
