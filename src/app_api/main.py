@@ -65,7 +65,11 @@ PREDICTION_COUNT = Counter(
 
 CPU_USAGE = Gauge("system_cpu_usage", "Usage CPU", registry=my_registry)
 
-logger.add("/logs/fastapi.log", rotation="500 MB")
+log_path = os.getenv(
+    "LOG_PATH", "logs/fastapi.log"
+)  # "logs/" sera dans le dossier courant
+os.makedirs(os.path.dirname(log_path), exist_ok=True)
+logger.add(log_path, rotation="500 MB")
 
 
 # Middleware — instrumente toutes les routes
@@ -167,7 +171,7 @@ async def health_check():
     return {"status": "OK", "message": "API is running"}
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     prepare_minio()
 
     port_env = os.getenv("FASTAPI_PORT", "8000")

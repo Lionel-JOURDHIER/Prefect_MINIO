@@ -84,7 +84,7 @@ def flow_train():
     train_and_register(model, X_train, y_train, X_test, y_test, params)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import subprocess
     import sys
 
