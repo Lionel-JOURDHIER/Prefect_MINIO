@@ -33,9 +33,9 @@ jobs:
 
       # --- TESTS FRONT-END ---
       - name: Install dependencies app_front
-        run: uv sync --project app_front --frozen --all-extras --all-groups
+        run: uv sync --project src/app_front --frozen --all-extras --all-groups
 
-      - name: Run Tests app_front
+      - name: Run Tests src/app_front
         env:
           FASTAPI_PORT: 8000
         run: |
