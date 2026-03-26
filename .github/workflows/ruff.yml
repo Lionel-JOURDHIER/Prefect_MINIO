@@ -23,24 +23,24 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
-          cache-dependency-glob: "scr/app_*/uv.lock"
+          cache-dependency-glob: "src/app_*/uv.lock"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install dependencies scr/app_front
+      - name: Install dependencies src/app_front
         run: uv sync --frozen --all-extras --all-groups
-        working-directory: scr/app_front
+        working-directory: src/app_front
 
-      - name: Run Ruff Check scr/app_front
+      - name: Run Ruff Check src/app_front
         # Vérifie les erreurs de code et de logique
         run: uv run ruff check .
-        working-directory: scr/app_front
+        working-directory: src/app_front
 
-      - name: Run Ruff Format scr/app_front
+      - name: Run Ruff Format src/app_front
         # Vérifie que le code est bien formaté (équivalent de Black)
         run: uv run ruff format --check .
-        working-directory: scr/app_front
+        working-directory: src/app_front
 
       - name: Install dependencies src/app_api
         run: uv sync --frozen --all-extras --all-groups
