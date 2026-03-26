@@ -77,13 +77,11 @@ source src/train/.venv/bin/activate
 ### Creation des workers
 ```bash
 prefect work-pool create "train-pool" --type docker
-prefect work-pool create "docker-cleaner-pool" --type docker
 ```
 
 ### Limitation du nombre de worker si espace disque limité
 ```bash
 prefect work-pool update --concurrency-limit 1 train-pool
-prefect work-pool update --concurrency-limit 1 docker-cleaner-pool
 ```
 
 ### Deploiement suivant le fichier prefect.yaml
@@ -250,6 +248,3 @@ Bien mettre les allowed-hosts à jour pour permettre l'accès à votre applicati
 | **fermer le docker prefect** | `(cd src/train && docker compose -f docker_compose.prefect.yml down)` |
 | **fermer le docker monitorinng** | `(cd monitoring && docker compose -f docker-compose.monitoring.yaml down)` |
 
-
-
-atte

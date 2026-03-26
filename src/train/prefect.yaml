@@ -25,6 +25,10 @@ push:
     image_name: '{{ build_image.image_name }}'
     tag: '{{ build_image.tag }}'
 
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: .
+      
 # the deployments section allows you to provide configuration
 # for deploying flows
 deployments:
@@ -45,6 +49,3 @@ deployments:
       env:
         MLFLOW_HOST: "host.docker.internal"
         MINIO_HOST: "host.docker.internal"
-  pull:
-    - prefect.deployments.steps.set_working_directory:
-        directory: .
