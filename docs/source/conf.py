@@ -7,8 +7,26 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import os
 import sys
+from unittest.mock import MagicMock
 
+
+# On crée une classe qui accepte d'être utilisée avec "with"
+class MagicContextManager(MagicMock):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+# On configure le mock de streamlit
+mock_st = MagicMock()
+mock_st.sidebar = MagicContextManager()  # On donne le pouvoir du "with" à sidebar
+
+# On force Python à utiliser ce mock au lieu de chercher la vraie librairie
+sys.modules["streamlit"] = mock_st
 sys.path.insert(0, os.path.abspath("../../"))
+sys.path.insert(0, os.path.abspath("../../src"))
 
 project = "Toolbox_MLobs"
 copyright = "2026, Lionel JOURDHIER"
@@ -47,3 +65,28 @@ html_theme_options = {
 }
 
 bibtex_default_style = "unsrt"
+
+autodoc_mock_imports = [
+    "boto3",
+    "dotenv",
+    "fastapi",
+    "loguru",
+    "mlflow",
+    "pandas",
+    "prometheus-client",
+    "protobuf",
+    "psutil",
+    "setuptools",
+    "uvicorn",
+    "requests",
+    "streamlit",
+    "prefect",
+    "prefect-docker",
+    "scikit-learn",
+    "sklearn",
+    "modules",
+    "prometheus_client",
+    "app",
+    "pydantic",
+    "starlette",
+]
