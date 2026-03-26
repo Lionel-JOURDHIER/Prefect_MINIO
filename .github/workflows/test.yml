@@ -46,7 +46,7 @@ jobs:
             --cov-config=src/app_front/pyproject.toml \
             --no-cov-on-fail \
             --cov-report=term-missing \
-            --cov-report=json:src/app_front/coverage_front.json \
+            --cov-report=xml\
             > src/app_front/pytest_report_front.txt 2>&1 
           
           echo "### UI Front-end" >> $GITHUB_STEP_SUMMARY
@@ -71,7 +71,7 @@ jobs:
             --cov-config=src/app_api/pyproject.toml \
             --no-cov-on-fail \
             --cov-report=term-missing \
-            --cov-report=json:src/app_api/coverage_front.json \
+            --cov-report=xml\
             > src/app_api/pytest_report_front.txt 2>&1
           
           echo "### UI Back-end" >> $GITHUB_STEP_SUMMARY
@@ -96,7 +96,7 @@ jobs:
             --cov-config=src/app_train/pyproject.toml \
             --no-cov-on-fail \
             --cov-report=term-missing \
-            --cov-report=json:src/app_train/coverage_front.json \
+            --cov-report=xml\
             > src/app_train/pytest_report_front.txt 2>&1
           
           echo "### UI Back-end" >> $GITHUB_STEP_SUMMARY
@@ -105,7 +105,11 @@ jobs:
           else
             echo "Aucun test trouvé ou erreur lors de l'exécution." >> $GITHUB_STEP_SUMMARY
           fi
-    
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       # --- ARCHIVAGE ---
       - name: Archive Code Coverage Results
         uses: actions/upload-artifact@v4
