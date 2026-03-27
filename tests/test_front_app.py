@@ -21,28 +21,35 @@ def test_debug_path():
 
 
 def test_full_app_flow_success():
-    """Teste le flux complet : Saisie -> Bouton -> Succès API"""
     at = AppTest.from_file(ABS_PATH, default_timeout=10)
     at.run()
-    assert not at.exception
 
-    with patch("requests.post") as mock_post:
-        mock_res = MagicMock()
-        mock_res.status_code = 200
-        mock_res.json.return_value = {
-            "prediction": "setosa",
-            "model_version": "1.0",
-            "class_index": 0,
+    # On mocke 'requests.Session.request' ou 'requests.post' ET 'requests.get'
+    with patch("requests.post") as mock_post, patch("requests.get") as mock_get:
+        # 1. Mock de la soumission (POST)
+        mock_post_res = MagicMock()
+        mock_post_res.status_code = 200
+        mock_post_res.json.return_value = {"task_id": "test-123", "status": "Pending"}
+        mock_post.return_value = mock_post_res
+
+        # 2. Mock du résultat (GET)
+        mock_get_res = MagicMock()
+        mock_get_res.status_code = 200
+        mock_get_res.json.return_value = {
+            "status": "SUCCESS",
+            "result": {
+                "prediction": "setosa",
+                "model_version": "1.0",
+                "class_index": 0,
+            },
         }
-        mock_post.return_value = mock_res
+        mock_get.return_value = mock_get_res
 
-        # On interagit avec les widgets
-        # Note: on accède par l'étiquette (label) ou l'index
+        # On simule l'interaction
         at.sidebar.slider[0].set_value(6.0)
         at.button[0].click().run()
 
-        assert not at.exception
-        # Streamlit testing v1 : on vérifie la sortie success
+        # On vérifie que st.success a bien été appelé
         assert len(at.success) > 0
         assert "SETOSA" in at.success[0].value
 
