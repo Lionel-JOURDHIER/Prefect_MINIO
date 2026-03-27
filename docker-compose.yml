@@ -82,6 +82,7 @@ services:
       context: ./src/app_api
       dockerfile: Dockerfile
     container_name: mon_api
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - minio
     ports:
@@ -91,16 +92,20 @@ services:
     restart: always
     environment:
       - FASTAPI_PORT=${FASTAPI_PORT:-8000}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
     networks:
       - front-api
       - api-backend
       - prefect-network
       - monitoring-network
+      - ml-network
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '0.50'
+
 
 volumes:
   minio_data:  
@@ -111,9 +116,13 @@ networks:
     driver: bridge
   api-backend: 
     driver: bridge
+    external: true
   prefect-network:
     driver: bridge
     external: true
   monitoring-network:
+    driver: bridge
+    external: true
+  ml-network:
     driver: bridge
     external: true

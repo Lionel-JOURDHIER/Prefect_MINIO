@@ -1,13 +1,12 @@
 import os
 import time
 
-import pandas as pd
 import psutil
 import uvicorn
+from celery.result import AsyncResult
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from loguru import logger
-from modules.load_model import load_production_model
 from modules.modele_reg import prepare_minio
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -19,6 +18,7 @@ from prometheus_client import (
 )
 from pydantic import BaseModel
 from starlette.responses import Response
+from worker import predict_iris_task
 
 load_dotenv()
 
@@ -112,45 +112,73 @@ class IrisInput(BaseModel):
 
 @app.post("/predict")
 async def predict(data: IrisInput):
-    # 1. Charger le modèle (utilise le cache ou recharge si nécessaire)
     logger.info(f"Donnée reçue : {data}")
-    PREDICTION_COUNT.labels(predicted_class="test").inc()
-    # REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
-    model, version = load_production_model()
-
-    if model is None:
-        raise HTTPException(status_code=500, detail="Le modèle n'a pas pu être chargé.")
-
-    # 2. Préparer les données pour le modèle (format DataFrame souvent requis par sklearn)
-    input_df = pd.DataFrame(
-        [data.model_dump().values()],
-        columns=[
-            "sepal length (cm)",
-            "sepal width (cm)",
-            "petal length (cm)",
-            "petal width (cm)",
-        ],
-    )
-
     try:
-        # 3. Prédiction
-        prediction = model.predict(input_df)
-
-        # 4. Traduction du résultat (0, 1, 2) en nom de fleur
-        target_names = ["setosa", "versicolor", "virginica"]
-        predicted_class = target_names[int(prediction[0])]
-
-        PREDICTION_COUNT.labels(predicted_class=predicted_class).inc()
-
-        return {
-            "prediction": predicted_class,
-            "class_index": int(prediction[0]),
-            "model_version": version,
-        }
+        task = predict_iris_task.delay(data.model_dump())
+        return {"task_id": task.id, "status": "Pending"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Erreur lors de la prédiction: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erreur broker : {str(e)}")
+
+
+@app.get("/result/{task_id}")
+async def get_result(task_id: str):
+    """Récupère le résultat d'une tâche Celery par son ID."""
+    result = AsyncResult(task_id)
+
+    if result.ready() and result.successful():
+        predicted_class = result.result.get("prediction")
+        if predicted_class:
+            # On incrémente le counter seulement quand le résultat est disponible
+            PREDICTION_COUNT.labels(predicted_class=predicted_class).inc()
+
+    return {
+        "task_id": task_id,
+        "status": result.status,  # PENDING | SUCCESS | FAILURE
+        "result": result.result if result.ready() else None,
+    }
+
+
+# @app.post("/predict")
+# async def predict(data: IrisInput):
+#     # 1. Charger le modèle (utilise le cache ou recharge si nécessaire)
+#     logger.info(f"Donnée reçue : {data}")
+#     PREDICTION_COUNT.labels(predicted_class="test").inc()
+#     # REQUEST_COUNT.labels(method="POST", endpoint="/predict").inc()
+#     model, version = load_production_model()
+
+#     if model is None:
+#         raise HTTPException(status_code=500, detail="Le modèle n'a pas pu être chargé.")
+
+#     # 2. Préparer les données pour le modèle (format DataFrame souvent requis par sklearn)
+#     input_df = pd.DataFrame(
+#         [data.model_dump().values()],
+#         columns=[
+#             "sepal length (cm)",
+#             "sepal width (cm)",
+#             "petal length (cm)",
+#             "petal width (cm)",
+#         ],
+#     )
+
+#     try:
+#         # 3. Prédiction
+#         prediction = model.predict(input_df)
+
+#         # 4. Traduction du résultat (0, 1, 2) en nom de fleur
+#         target_names = ["setosa", "versicolor", "virginica"]
+#         predicted_class = target_names[int(prediction[0])]
+
+#         PREDICTION_COUNT.labels(predicted_class=predicted_class).inc()
+
+#         return {
+#             "prediction": predicted_class,
+#             "class_index": int(prediction[0]),
+#             "model_version": version,
+#         }
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500, detail=f"Erreur lors de la prédiction: {str(e)}"
+#         )
 
 
 @app.get("/")

@@ -171,6 +171,262 @@ Pour verifier que l'ensemble du projet est lancé, veuillez vous connecter aux a
 |Grafana|http://localhost:3000|Vérifiez que le dashboard est fonctionnel et affiche les métriques|
 |Uptime Kuma|http://localhost:3001|Vérifiez que le service de monitoring est fonctionnel|
 
+# CI/CD & Documentation Automatisée
+
+---
+
+## Docs automatisée
+
+La documentation du projet est générée automatiquement via **Sphinx** et déployée sur **GitHub Pages** à chaque push sur `main`.
+
+### Fonctionnement
+
+1. Les dépendances de `docs/` et de chaque `app_*` sont installées via `uv`.
+2. `sphinx-apidoc` génère un squelette de documentation pour chaque module `app_*`.
+3. `sphinx-build` compile le tout en HTML dans un dossier `public/`.
+4. L'artifact est déployé sur GitHub Pages via `actions/deploy-pages`.
+
+### Accès
+
+| Lien | Description |
+| :--- | :--- |
+| [![Documentation](https://img.shields.io/badge/Documentation-GitHub%20Pages-blue?logo=github&logoColor=white)](https://lionel-jourdhier.github.io/Prefect_MINIO/) | Documentation générée automatiquement |
+
+---
+
+## Github Actions
+
+Le projet dispose de **5 workflows** automatisés couvrant la sécurité, la qualité du code, les tests, le déploiement Docker et la documentation.
+
+### Vue d'ensemble
+
+| Workflow | Déclencheur | Rôle |
+| :--- | :--- | :--- |
+| `secrets.yml` | Push sur `main`, `dev`, `feat/**` | Scan des secrets avec Gitleaks |
+| `ruff.yml` | Push sur `main`, `dev`, `feat/**` | Lint & format via Ruff |
+| `test.yml` | Push/PR sur `main`, `dev`, `feat/**` | Tests Pytest + couverture Codecov |
+| `deploy.yml` | Push sur `main` | Build & push des images Docker Hub |
+| `documentation.yml` | Push sur `main` | Génération et déploiement Sphinx |
+
+---
+
+### Secrets
+
+**Fichier :** `.github/workflows/secrets.yml`
+
+Scan automatique du dépôt à chaque push pour détecter des secrets accidentellement commités (clés API, tokens, mots de passe) via **Gitleaks**.
+
+```
+Push → Gitleaks scan → ✅ OK / ❌ Alerte
+```
+
+---
+
+### Ruff — Lint & Format
+
+**Fichier :** `.github/workflows/ruff.yml`
+
+Vérifie la qualité et le formatage du code sur les trois modules (`app_front`, `app_api`, `app_train`) via **Ruff** (équivalent de Flake8 + Black).
+
+```
+Push → uv sync → ruff check → ruff format --check
+              └── (×3 modules)
+```
+
+---
+
+### Tests — Pytest & Codecov
+
+**Fichier :** `.github/workflows/test.yml`
+
+Exécute les tests unitaires sur les trois modules, génère les rapports de couverture et les envoie sur **Codecov**.
+
+```
+Push/PR → uv sync → pytest + coverage → Codecov upload → Artifact archivé
+               └── (×3 modules)
+```
+
+Les résultats de couverture sont visibles directement dans le **résumé de la pipeline** GitHub (`$GITHUB_STEP_SUMMARY`).
+
+[![codecov](https://codecov.io/gh/lionel-jourdhier/prefect_minio/graph/badge.svg?token=VOTRE_TOKEN_GRAPHIQUE)](https://codecov.io/gh/lionel-jourdhier/prefect_minio)
+
+---
+
+### Déploiement Docker
+
+**Fichier :** `.github/workflows/deploy.yml`
+
+Pipeline complète de déploiement déclenchée uniquement sur `main`. Elle enchaîne sécurité → tests → build → push sur Docker Hub.
+
+```
+Push (main)
+  └── security-and-lint
+        └── Gitleaks scan
+  └── test-and-deploy (needs: security-and-lint)
+        ├── Tests (front + api + train)
+        ├── Login Docker Hub
+        └── Build & Push
+              ├── toolbox-front:latest
+              ├── toolbox-api:latest
+              └── toolbox-train:latest
+```
+
+> ⚠️ Les secrets `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` doivent être configurés dans **Settings → Secrets and variables → Actions** de ton dépôt GitHub.
+
+---
+
+### Documentation Sphinx
+
+**Fichier :** `.github/workflows/documentation.yml`
+
+Génère la documentation Sphinx et la déploie sur GitHub Pages à chaque push sur `main`.
+
+```
+Push (main)
+  └── build-docs
+        ├── sphinx-apidoc (×chaque app_*)
+        └── sphinx-build → public/
+  └── deploy-docs (needs: build-docs)
+        └── GitHub Pages
+```
+
+## Broker
+
+Le système de prédiction utilise une architecture asynchrone basée sur **Celery**, **RabbitMQ** et **Redis** pour découpler la réception des requêtes de l'exécution du modèle.
+
+---
+
+### Fonctionnement
+
+```
+Streamlit → POST /predict → FastAPI → RabbitMQ (broker) → Celery Worker → Redis (result backend)
+                                ↑                                                      ↓
+                         GET /result/{task_id} ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+```
+
+1. **FastAPI** reçoit la requête et soumet une tâche à **RabbitMQ** — il retourne immédiatement un `task_id` sans bloquer.
+2. **RabbitMQ** agit comme file d'attente (*message broker*) : il distribue les tâches aux workers disponibles.
+3. **Celery Worker** consomme la tâche, charge le modèle MLflow et effectue la prédiction.
+4. **Redis** stocke le résultat une fois la prédiction terminée (*result backend*).
+5. **Streamlit** poll l'endpoint `GET /result/{task_id}` jusqu'à récupérer le résultat.
+
+---
+
+### Services
+
+| Service | Rôle | Port | Interface |
+| :--- | :--- | :--- | :--- |
+| **RabbitMQ** | Message broker — file d'attente des tâches | `5672` | UI : http://localhost:15672 (guest/guest) |
+| **Redis** | Result backend — stockage des résultats | `6379` | — |
+| **Celery Worker** | Exécution asynchrone des prédictions | — | — |
+
+---
+
+### Variables d'environnement
+
+| Variable | Description | Valeur par défaut |
+| :--- | :--- | :--- |
+| `CELERY_BROKER_URL` | URL de connexion à RabbitMQ | `amqp://guest:guest@rabbitmq:5672//` |
+| `CELERY_RESULT_BACKEND` | URL de connexion à Redis | `redis://redis:6379/0` |
+| `MODEL_LATENCY` | Latence simulée en secondes (tests) | `0` |
+| `AWS_ACCESS_KEY_ID` | Clé d'accès à AWS | — |
+| `AWS_SECRET_ACCESS_KEY` | Clé secrète d'accès à AWS | — |
+---
+
+## Configuration Docker Compose
+
+```yaml
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - ml-network
+    volumes:
+      - ./rabbitmq:/data
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis:/data
+    networks:
+      - ml-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build: ./src/app_api
+    container_name: celery_worker
+    command: celery -A worker.app worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - MODEL_LATENCY=0
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ml-network
+      - api-backend
+
+  flower:
+    image: mher/flower:latest
+    container_name: celery_flower
+    command: celery --broker=${CELERY_BROKER_URL} flower
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+
+    depends_on:
+      - rabbitmq
+      - redis
+      - worker
+    networks:
+      - ml-network
+
+networks:
+  ml-network:
+    driver: bridge
+    external: true
+  api-backend: 
+    driver: bridge
+    external: true
+```
+
+---
+
+## Commandes utiles
+
+| Action | Commande |
+| :--- | :--- |
+| **Voir les logs du worker** | `docker logs -f celery_worker` |
+| **Monitorer les tâches RabbitMQ** | http://localhost:15672 |
+| **Scaler les workers** | `docker compose up --scale worker=3` |
+
 
 ## 📂 Structure du Projet
 ```

@@ -1,4 +1,5 @@
 import os
+import time
 
 import requests
 import streamlit as st
@@ -32,18 +33,48 @@ if st.button("Prédire l'espèce"):
     }
 
     try:
-        # Appel à ton API FastAPI
-        with st.spinner("Interrogation du modèle..."):
-            response = requests.post(f"{API_URL}/predict", json=payload)
+        with st.spinner("Envoi au worker..."):
+            response = requests.post(
+                f"{API_URL}/predict",
+                json=payload,
+                timeout=30,  # ← échoue proprement si l'API ne répond pas
+            )
             response.raise_for_status()
-            result = response.json()
+            task_id = response.json()["task_id"]
 
-        # 3. Affichage du résultat
-        st.success(f"Résultat : **{result['prediction'].upper()}**")
+        st.info(f"Tâche soumise : `{task_id}`")
 
-        col1, col2 = st.columns(2)
-        col1.metric("Version du modèle", result["model_version"])
-        col2.metric("Index de classe", result["class_index"])
+        # 2. Polling (boucle d'attente) pour le résultat
+        result_placeholder = st.empty()
+        result = None
+
+        with st.spinner("Interrogation du modèle..."):
+            for _ in range(20):
+                poll = requests.get(f"{API_URL}/result/{task_id}")
+                poll.raise_for_status()
+                data = poll.json()
+
+                result_placeholder.caption(f"Statut : `{data['status']}`")
+
+                if data["status"] == "SUCCESS":
+                    result = data["result"]
+                    break
+                elif data["status"] == "FAILURE":
+                    st.error("La tâche Celery a échoué côté worker.")
+                    st.stop()
+
+                time.sleep(0.5)
+
+        result_placeholder.empty()
+
+        # 3. Résultat
+        if result:
+            st.success(f"Résultat : **{result['prediction'].upper()}**")
+            col1, col2 = st.columns(2)
+            col1.metric("Version du modèle", result["model_version"])
+            col2.metric("Index de classe", result["class_index"])
+        else:
+            st.warning("⏱️ Timeout : le worker n'a pas répondu en 10s.")
 
     except Exception as e:
         st.error(f"Erreur de connexion à l'API : {e}")

@@ -28,13 +28,10 @@ def test_metrics():
     assert "system_cpu_usage" in response.text
 
 
-# 4. TEST : Prédiction (Succès)
-@patch("main.load_production_model")
-def test_predict_success(mock_load):
-    # On mocke le modèle pour qu'il renvoie une prédiction
-    mock_model = MagicMock()
-    mock_model.predict.return_value = [0]  # 0 = setosa
-    mock_load.return_value = (mock_model, "1.0")
+# 4. TEST : Prédiction (Succès) — /predict retourne un task_id
+@patch("main.predict_iris_task.delay")
+def test_predict_success(mock_delay):
+    mock_delay.return_value.id = "fake-task-id"
 
     payload = {
         "sepal_length": 5.1,
@@ -45,39 +42,81 @@ def test_predict_success(mock_load):
     response = client.post("/predict", json=payload)
 
     assert response.status_code == 200
-    assert response.json()["prediction"] == "setosa"
-    assert response.json()["model_version"] == "1.0"
+    assert response.json()["task_id"] == "fake-task-id"
+    assert response.json()["status"] == "Pending"
+    mock_delay.assert_called_once_with(payload)
 
 
-# 5. TEST : Erreur de chargement de modèle (Ligne 116)
-@patch("main.load_production_model")
-def test_predict_no_model(mock_load):
-    mock_load.return_value = (None, None)
-
-    payload = {"sepal_length": 0, "sepal_width": 0, "petal_length": 0, "petal_width": 0}
+# 5. TEST : Erreur broker — Celery indisponible
+@patch("main.predict_iris_task.delay", side_effect=Exception("broker down"))
+def test_predict_no_model(mock_delay):
+    payload = {
+        "sepal_length": 5.1,
+        "sepal_width": 3.5,
+        "petal_length": 1.4,
+        "petal_width": 0.2,
+    }
     response = client.post("/predict", json=payload)
     assert response.status_code == 500
-    assert "Le modèle n'a pas pu être chargé" in response.json()["detail"]
+    assert "broker" in response.json()["detail"]
 
 
-# 6. TEST : Erreur lors de la prédiction (Ligne 138)
-@patch("main.load_production_model")
-def test_predict_error_during_inference(mock_load):
-    mock_model = MagicMock()
-    mock_model.predict.side_effect = Exception("Inference Crash")
-    mock_load.return_value = (mock_model, "1.0")
+# 6. TEST : /result — tâche en succès
+@patch("main.AsyncResult")
+def test_get_result_success(mock_async_result):
+    mock_result = MagicMock()
+    mock_result.status = "SUCCESS"
+    mock_result.ready.return_value = True
+    mock_result.successful.return_value = True
+    mock_result.result = {
+        "prediction": "setosa",
+        "class_index": 0,
+        "model_version": "1.0",
+    }
+    mock_async_result.return_value = mock_result
 
-    response = client.post(
-        "/predict",
-        json={"sepal_length": 1, "sepal_width": 1, "petal_length": 1, "petal_width": 1},
-    )
-    assert response.status_code == 500
-    assert "Erreur lors de la prédiction" in response.json()["detail"]
+    response = client.get("/result/fake-task-id")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    assert response.json()["result"]["prediction"] == "setosa"
 
 
+# 7. TEST : /result — tâche en cours (PENDING)
+@patch("main.AsyncResult")
+def test_get_result_pending(mock_async_result):
+    mock_result = MagicMock()
+    mock_result.status = "PENDING"
+    mock_result.ready.return_value = False
+    mock_result.successful.return_value = False
+    mock_async_result.return_value = mock_result
+
+    response = client.get("/result/fake-task-id")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "PENDING"
+    assert response.json()["result"] is None
+
+
+# 8. TEST : /result — tâche en échec (FAILURE)
+@patch("main.AsyncResult")
+def test_predict_error_during_inference(mock_async_result):
+    mock_result = MagicMock()
+    mock_result.status = "FAILURE"
+    mock_result.ready.return_value = True
+    mock_result.successful.return_value = False
+    mock_result.result = {"error": "modèle introuvable"}
+    mock_async_result.return_value = mock_result
+
+    response = client.get("/result/fake-task-id")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "FAILURE"
+
+
+# 9. TEST : Middleware — gestion des erreurs
 def test_middleware_error_handling():
     """Force une erreur pour couvrir la branche 'except' du middleware"""
-    # On patche une fonction appelée par la route /health pour qu'elle crashe
     with patch(
         "main.logger.debug", side_effect=RuntimeError("Middleware Trigger Test")
     ):
